@@ -160,8 +160,8 @@ else
     echo "Table '$table_name' created successfully."
 fi
 ;;
-                        2)## ls
-                                
+                        2)
+                                ls -p | grep -v / | grep -v 'meta' | sed 's/\_data\b//'
                             ;;
 
                         3)
@@ -182,119 +182,233 @@ fi
                             fi
                             ;;
 
-                        4) ##insert
+                        4)
 
+
+#!/bin/bash
+
+# الحصول على اسم الجدول من المستخدم#!/bin/bash
+
+# الحصول على اسم الجدول من المستخدم
+#!/bin/bash
+
+# الحصول على اسم الجدول من المستخدم
+read -p "Enter Table Name to insert: " table_name
+
+# التحقق من وجود ملف الميتاداتا للجدول
+if [ ! -f "${table_name}_metadata" ]; then
+    echo "Table '$table_name' does not exist."
+    exit 1
+fi
+
+# قراءة معلومات الأعمدة من ملف الميتاداتا
+declare -a column_names=()
+declare -a column_types=()
+while IFS=':' read -r name type; do
+    column_names+=("$name")
+    column_types+=("$type")
+done < "${table_name}_metadata"
+
+# التحقق من أن أول عمود غير فارغ وغير مكرر
+read -p "Enter value for ${column_names[0]} (${column_types[0]}): " first_value
+if [ -z "$first_value" ]; then
+    echo "The first column cannot be empty."
+    exit 1
+fi
+
+# التحقق من أن القيمة غير مكررة في العمود الأول لأي صف
+if grep -q "^$first_value:" "${table_name}_data"; then
+    echo "The value '$first_value' in the first column already exists."
+    exit 1
+fi
+
+# جمع القيم في صف واحد
+row="$first_value"
+for ((i=1; i<${#column_names[@]}; i++)); do
+    read -p "Enter value for ${column_names[i]} (${column_types[i]}): " value
+    row="$row:$value"
+done
+
+# إضافة الصف إلى ملف البيانات
+echo "$row" >> "${table_name}_data"
+
+echo "Data added to table '$table_name' successfully."
+
+;;
         5)
-                            read -p "Enter Table Name to Select from: " table_name
-                            
-            if [[ "$table_name" =~ [[:punct:][:space:]] ]] 
-            then
-                echo "Invalid characters in the name."
-                
-                 return
-            fi
-                            if [ -f "${table_name}_data" ]
-                            then
-                                cat "${table_name}_data"
-                            else
-                                echo "Table does not exist."
-                            fi
-                            ;;
+                          #!/bin/bash
 
-                        6) ##DALT
-                             
-                        7)
-                           read -p "Enter Table Name to Update: " table_name
+# الحصول على اسم الجدول من المستخدم
+read -p "Enter Table Name to Select from: " table_name
 
+# التحقق من وجود أحرف غير صالحة في الاسم
 if [[ "$table_name" =~ [[:punct:][:space:]] ]]; then
     echo "Invalid characters in the name."
     exit 1
 fi
 
-if [ -f "${table_name}_data" ] && [ -f "${table_name}_metadata" ]; then
-    echo "Enter id to update:"
-    read id
-
-    # Check if the specified id exists in the data file
-    if grep -q "^$id," "${table_name}_data"; then
-        # Read column details from metadata file
-        declare -a column_names=()
-        declare -a column_types=()
-        while read -r line; do
-            IFS=':' read -ra column_info <<< "$line"
-            column_names+=("${column_info[0]}")
-            column_types+=("${column_info[1]}")
-        done < "${table_name}_metadata"
-
-        # Prompt user to update each column
-        new_data=()
-        for i in "${!column_names[@]}"; do
-            column_name="${column_names[$i]}"
-            column_type="${column_types[$i]}"
-
-            if [ "$column_name" = "id" ]; then
-                # Validate and update the id column
-                while true; do
-                    read -p "Enter new value for column 'id' (type: $column_type): " id_value
-                    if [ -z "$id_value" ]; then
-                        echo "The id column cannot be empty."
-                    elif ! [[ "$id_value" =~ ^[0-9]+$ ]]; then
-                        echo "Invalid integer value for the id column."
-                    elif grep -q "^$id_value," "${table_name}_data" && [ "$id_value" != "$id" ]; then
-                        echo "The id '$id_value' already exists in the table."
-                    else
-                        new_data+=("$id_value")
-                        break
-                    fi
-                done
-            else
-                # Prompt user for updated value and validate based on column type
-                while true; do
-                    read -p "Enter new value for column '$column_name' (type: $column_type, leave empty for NULL): " value
-                    if [ -z "$value" ]; then
-                        value="NULL"
-                        new_data+=("$value")
-                        break
-                    fi
-
-                    case "$column_type" in
-                        integer)
-                            if [[ "$value" =~ ^[0-9]+$ ]]; then
-                                new_data+=("$value")
-                                break
-                            else
-                                echo "Invalid integer value for column '$column_name'"
-                            fi
-                            ;;
-                        string)
-                            if [[ "$value" =~ ^[a-zA-Z]+$ ]]; then
-                                new_data+=("$value")
-                                break
-                            else
-                                echo "Invalid string value for column '$column_name'. Please enter only letters."
-                            fi
-                            ;;
-                        *)
-                            echo "Unknown data type '$column_type' for column '$column_name'"
-                            exit 1
-                            ;;
-                    esac
-                done
-            fi
-        done
-
-        # Remove the existing row with the specified id
-        sed -i "/^$id,/d" "${table_name}_data"
-
-        # Append the new data to the file
-        echo "$(IFS=','; echo "${new_data[*]}")" >> "${table_name}_data"
-        echo "Data updated."
-    else
-        echo "Record with id $id not found in the table."
-    fi
-else
+# التحقق من وجود ملف البيانات
+if [ ! -f "${table_name}_data" ]; then
     echo "Table does not exist."
+    exit 1
 fi
+
+# تقديم الخيارات للمستخدم
+echo "Choose an option:"
+echo "1. Display all data"
+echo "2. Display a specific column"
+echo "3. Display a specific row"
+read -p "Enter your choice (1/2/3): " choice
+
+case $choice in
+    1)
+        # عرض كل البيانات
+        cat "${table_name}_data"
+        ;;
+    2)
+        # عرض عمود محدد
+        read -p "Enter the column number to display: " col_num
+        awk -v col="$col_num" -F":" '{print $col}' "${table_name}_data"
+        ;;
+    3)
+        # عرض صف محدد
+        read -p "Enter the row number to display: " row_num
+        sed -n "${row_num}p" "${table_name}_data"
+        ;;
+    *)
+        echo "Invalid choice."
+        exit 1
+        ;;
+esac
+
+                            ;;
+
+                        6)
+                             read -p "Enter table name: " table
+
+    if [[ -f ${table}_data ]]; then
+        echo "Choose an option:"
+        echo "1. Delete row"
+        echo "2. Delete column"
+        echo "3. Delete specific data"
+        read -p "Enter your choice: " choice
+
+        case $choice in
+            1)
+                # Delete row
+                read -p "Enter row number to delete (excluding header): " row_num
+                if [[ $row_num -ge 1 ]]; then
+                    # Adjust row_num to account for header
+                    row_num=$((row_num + 1))
+                    sed -i "${row_num}d" $table
+                    echo "Row $row_num deleted from ${table}_data."
+                else
+                    echo "Invalid row number."
+                fi
+                ;;
+            2)
+                # Delete column
+                read -p "Enter column number to delete: " col_num
+                if [[ $col_num -ge 1 ]]; then
+                  awk -v col=$col_num 'BEGIN {FS=OFS=","} { for (i=col; i<NF; i++) $i=$(i+1); NF--; print }' $table >temp && mv temp ${table}_data
+                    echo "Column $col_num deleted from $table."
+                else
+                    echo "Invalid column number."
+                fi
+                ;;
+            3)
+                # Delete specific data
+                read -p "Enter data to delete: " data
+                awk -v data="${data}_data" 'BEGIN {FS=OFS=","} 
+                {
+                    for(i=1; i<=NF; i++) {
+                        if ($i == data) $i=""
+                    } 
+                    print
+                }' ${table}_data > temp && mv temp $table
+                echo "Data '$data' deleted from $table."
+                ;;
+            *)
+                echo "Invalid choice."
+                ;;
+        esac
+    else
+        echo "Table $table does not exist."
+    fi
+;;
+                        7)
+                          #!/bin/bash
+
+# الحصول على اسم الجدول من المستخدم
+read -p "Enter Table Name to Modify: " table_name
+
+# التحقق من وجود أحرف غير صالحة في الاسم
+if [[ "$table_name" =~ [[:punct:][:space:]] ]]; then
+    echo "Invalid characters in the name."
+    exit 1
+fi
+
+# التحقق من وجود ملف البيانات
+if [ ! -f "${table_name}_data" ]; then
+    echo "Table does not exist."
+    exit 1
+fi
+
+# قراءة معلومات الأعمدة من ملف الميتاداتا
+declare -a column_names=()
+declare -a column_types=()
+while IFS=':' read -r name type; do
+    column_names+=("$name")
+    column_types+=("$type")
+done < "${table_name}_metadata"
+
+# الحصول على رقم الصف والعمود من المستخدم
+read -p "Enter the row number to modify: " row_num
+read -p "Enter the column number to modify: " col_num
+
+# التحقق من صلاحية المدخلات
+if ! [[ "$row_num" =~ ^[0-9]+$ ]] || ! [[ "$col_num" =~ ^[0-9]+$ ]]; then
+    echo "Invalid row or column number."
+    exit 1
+fi
+
+# الحصول على القيمة الجديدة
+read -p "Enter the new value: " new_value
+
+# التحقق من نوع البيانات للقيمة الجديدة
+col_type=${column_types[$((col_num - 1))]}
+case $col_type in
+    int)
+        if ! [[ "$new_value" =~ ^[0-9]+$ ]]; then
+            echo "Invalid value type. Expected integer."
+            exit 1
+        fi
+        ;;
+    string)
+        if [[ "$new_value" =~ [[:punct:][:space:]] ]]; then
+            echo "Invalid value type. Expected string without spaces or punctuation."
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Unknown column type."
+        exit 1
+        ;;
+esac
+
+# إذا كان العمود الأول، تحقق من أن القيمة غير مكررة
+if [ "$col_num" -eq 1 ]; then
+    if grep -q "^$new_value:" "${table_name}_data"; then
+        echo "The value '$new_value' in the first column already exists."
+        exit 1
+    fi
+fi
+
+# تعديل القيمة في الصف والعمود المحددين
+awk -v row="$row_num" -v col="$col_num" -v val="$new_value" -F":" 'BEGIN {OFS=FS} NR==row {$col=val} 1' "${table_name}_data" > temp && mv temp "${table_name}_data"
+
+echo "Value updated successfully in row $row_num, column $col_num."
+
 ;;
                         8)
                             cd ..
